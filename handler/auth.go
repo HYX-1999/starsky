@@ -3,7 +3,7 @@
  * @Author: hyx
  * @Date: 2022-07-27 10:41:06
  * @LastEditors: hyx
- * @LastEditTime: 2022-07-27 11:48:32
+ * @LastEditTime: 2022-07-27 16:23:40
  */
 
 package handler
@@ -17,13 +17,13 @@ import (
 	"github.com/HYX-1999/starsky/models"
 	"github.com/HYX-1999/starsky/types"
 	"github.com/HYX-1999/starsky/utils"
-	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v4"
 )
 
 type JWTClaims struct {
 	Username string `json:"username"`
-	jwt.StandardClaims
+	jwt.RegisteredClaims
 }
 
 const TokenExpireDuration = time.Hour * 2
@@ -38,13 +38,14 @@ var Secret = []byte("gin-api-blog")
 func GenToken(username string) (string, error) {
 	c := JWTClaims{
 		"username", // 自定义字段
-		jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(TokenExpireDuration).Unix(), // 过期时间
-			Issuer:    "heyuxin",                                  // 签发人
+		jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)), // 过期时间
+			Issuer:    "heyuxin",                                          // 签发人
 		},
 	}
 	// 使用指定的签名方法创建签名对象
-	token := jwt.NewWithClaims(jwt.SigningMethodES256, c)
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, c)
+	token.SignedString(Secret)
 	// 使用指定的secret签名并获得完整的编码后的字符串token
 	return token.SignedString(Secret)
 }
@@ -84,10 +85,13 @@ func AuthLogin(c *gin.Context) {
 	fmt.Println(userInfo)
 	// 校验用户名和密码是否正确
 	if username == userInfo[0].Username && password == userInfo[0].Password {
-		tokenString, _ := GenToken(username)
+		tokenString, err := GenToken(username)
+		if err != nil {
+			utils.Error(c, int(types.ApiCode.AUTHFAILED), types.ApiCode.GetMessage(types.ApiCode.AUTHFAILED))
+			return
+		}
 		utils.Success(c, tokenString)
 		return
 	}
 	utils.Error(c, int(types.ApiCode.AUTHFAILED), types.ApiCode.GetMessage(types.ApiCode.AUTHFAILED))
-	return
 }
